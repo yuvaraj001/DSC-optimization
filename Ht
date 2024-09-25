@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Retention Dashboard</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+        body {
+            padding: 20px;
+        }
+        .customer-list {
+            max-width: 600px;
+            margin: auto;
+        }
+        .customer {
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        .details {
+            display: none;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1 class="text-center">Customer Retention Dashboard</h1>
+        <div class="customer-list">
+            <div id="customer-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // Fetch the customer data from the backend (will be powered by Flask)
+        fetch('/customers')
+            .then(response => response.json())
+            .then(data => {
+                const customerList = document.getElementById('customer-list');
+                data.forEach(customer => {
+                    const customerDiv = document.createElement('div');
+                    customerDiv.classList.add('customer', 'card', 'p-3');
+                    customerDiv.innerHTML = `<h5>${customer.name}</h5>`;
+                    
+                    const detailsDiv = document.createElement('div');
+                    detailsDiv.classList.add('details');
+                    detailsDiv.innerHTML = `<p>Attrition Score: ${customer.attrition_score}</p>
+                                            <p>Key Value: ${customer.key_value}</p>`;
+                    
+                    customerDiv.appendChild(detailsDiv);
+                    
+                    customerDiv.addEventListener('click', () => {
+                        detailsDiv.style.display = detailsDiv.style.display === 'none' ? 'block' : 'none';
+                    });
+                    
+                    customerList.appendChild(customerDiv);
+                });
+            });
+    </script>
+</body>
+</html>
