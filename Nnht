@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Retention Dashboard</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+        body {
+            padding: 20px;
+        }
+
+        .container-fluid {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        /* Left column (customer list) */
+        .customer-list-container {
+            flex: 1;
+            max-width: 40%;
+        }
+
+        /* Right column (Looker chart) */
+        .chart-container {
+            flex: 2;
+            margin-left: 20px;
+        }
+
+        .customer-list {
+            max-width: 100%;
+            margin: auto;
+            overflow-y: auto;
+            max-height: 80vh;
+        }
+
+        .customer {
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+
+        .details {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        iframe {
+            width: 100%;
+            height: 80vh;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container-fluid">
+        <!-- Left Side: Customer List -->
+        <div class="customer-list-container">
+            <div class="controls">
+                <h2>Customers</h2>
+                
+                <!-- Sort by Net Worth Dropdown -->
+                <div>
+                    <label for="sort">Sort by:</label>
+                    <select id="sort" class="form-control">
+                        <option value="default">Default</option>
+                        <option value="asc">Net Worth: Low to High</option>
+                        <option value="desc">Net Worth: High to Low</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Filter by Customer Name or Net Worth Range -->
+            <div class="form-group">
+                <label for="filter">Filter by Name or Net Worth:</label>
+                <input type="text" id="filter" class="form-control" placeholder="Type customer name or net worth range">
+            </div>
+
+            <!-- Customer List -->
+            <div class="customer-list">
+                <div id="customer-list"></div>
+            </div>
+
+            <!-- Pagination controls (Next button) -->
+            <div class="pagination-controls">
+                <button id="next-btn" class="btn btn-primary">Next</button>
+            </div>
+        </div>
+
+        <!-- Right Side: Looker Chart -->
+        <div class="chart-container">
+            <h3>Customer Trend Chart</h3>
+            <iframe id="looker-embed" src="about:blank"></iframe>
+        </div>
+    </div>
+
+    <script>
+        const lookerBaseEmbedUrl = 'https://your-looker-instance.com/embed/looks/some_embed_token';
+        let customerData = [];  // Stores the full customer data
+        let currentPage = 0;    // Tracks the current page for pagination
+        const pageSize = 10;    // Number of customers per page
+
+        // Function to render the customer list (pagination logic)
+        function renderCustomerList(data) {
+            const customerList = document.getElementById('customer-list');
+            customerList.innerHTML = '';  // Clear previous entries
+
+            data.forEach(customer => {
+                const customerDiv = document.createElement('div');
+                customerDiv.classList.add('customer', 'card', 'p-3', 'mb-2');
+                customerDiv.innerHTML = `<h5>${customer.name} - Net Worth: $${customer.net_worth}</h5>`;
+
+                const detailsDiv = document.createElement('div');
+                detailsDiv.classList.add('details');
+                detailsDiv.innerHTML = `<p>Attrition Score: ${customer.attrition_score}</p>
+                                        <p>Key Value: ${customer.key_value}</p>`;
+                
+                customerDiv.appendChild(detailsDiv);
+
+                // Add event listener to load Looker chart on click
+                customerDiv.addEventListener('click', () => {
+                    detailsDiv.style.display = detailsDiv.style.display === 'none' ? 'block' : 'none';
+                    const embedUrl = `${lookerBaseEmbedUrl}?customer_id=${customer.customer_id}`;
+                    document.getElementById('looker-embed').src = embedUrl;
+                });
+
+                customerList.appendChild(customerDiv);
+            });
+        }
+
+        // Fetch customer data from the backend
+        fetch('/customers')
+            .then(response => response.json())
+            .then(data => {
+                customerData = data;  // Store the full customer data
+                paginateAndRender();  // Render the first page of customers
+            })
+            .catch(error => console.error('Error fetching customers:', error));
+
+        // Function to paginate and render the customer list
+        function paginateAndRender() {
+            const start = currentPage * pageSize;
+            const end = start + pageSize;
+            const paginatedData = customerData.slice(start, end);
+            renderCustomerList(paginatedData);
+        }
+
+        // Event listener for the "Next" button
+        document.getElementById('next-btn').addEventListener('click', function() {
+            // Move to the next page if there are more customers to display
+            if ((currentPage + 1) * pageSize < customerData.length) {
+                currentPage++;
+                paginateAndRender();
+            } else {
+                alert('No more customers to display.');
+            }
+        });
+
+        // Sort the customer list based on net worth
+        document.getElementById('sort').addEventListener('change', function() {
+            const sortValue = this.value;
+            if (sortValue === 'asc') {
+                customerData.sort((a, b) => a.net_worth - b.net_worth);
+            } else if (sortValue === 'desc') {
+                customerData.sort((a, b) => b.net_worth - a.net_worth);
+            }
+            currentPage = 0;  // Reset to the first page after sorting
+            paginateAndRender();  // Re-render the sorted list
+        });
+
+        // Filter the customer list by name or net worth range
+        document.getElementById('filter').addEventListener('input', function() {
+            const filterValue = this.value.toLowerCase();
+            let filteredData = customerData.filter(customer => {
+                const matchesName = customer.name.toLowerCase().includes(filterValue);
+
+                const netWorthRange = filterValue.split('-').map(Number);
+                const matchesNetWorthRange = netWorthRange.length === 2 && customer.net_worth >= netWorthRange[0] && customer.net_worth <= netWorthRange[1];
+
+                return matchesName || matchesNetWorthRange;
+            });
+            currentPage = 0;  // Reset to the first page after filtering
+            renderCustomerList(filteredData);  // Re-render the filtered list
+        });
+    </script>
+</body>
+</html>
