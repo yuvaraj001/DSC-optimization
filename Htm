@@ -1,75 +1,97 @@
+from flask import Flask, render_template, redirect, url_for
+from google.cloud import bigquery
+from flask import request
+ 
+app = Flask(__name__)
+ 
+# Initialize BigQuery client
+client = bigquery.Client()
+ 
+@app.route('/')
+def index():
+    with open('llm.sql','r') as file:
+        query = file.read()
+    query_job = client.query(query)
+ 
+    # Convert the query result to a list of dictionaries
+    results = [dict(row) for row in query_job]
+ 
+    # Render the index.html template with the query results
+    return render_template('index.html', rows=results)
+
+@app.route('/update_status', methods=['POST'])
+def update_status():
+  try:
+    Error_id = request.form['Error_id']
+    Error_category = request.form['Error_category']
+    status = request.form['status']
+ 
+    if status == "approved":
+       # Construct the BigQuery update query
+      update_query = f"""
+        UPDATE `gbg-neuro.TECHNOCRATIC_AI.ABI_Errors`
+        SET Error_category = '{Error_category}'
+        WHERE Error_id = {Error_id}
+      """
+ 
+       # Execute the update query
+      client.query(update_query)
+  except Exception as e:
+    print(f"An error occurred: {e}")
+ 
+    # Redirect back to the index page
+  return redirect(url_for('index'))
+ 
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Dropdown Selection and Table Display</title>
-    <style>
-        table, th, td {
-            border: 1px solid black;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 5px;
-            text-align: left;
-        }
-    </style>
+    <meta charset="UTF-8">
+    <title>Technocratic AI</title>
 </head>
 <body>
-    <h2>Select Options</h2>
-    <form id="selectionForm">
-        <!-- Creating 10 dropdown fields -->
-        <!-- Repeat the following block for dropdowns 2 to 10 -->
-        <div>
-            <label for="dropdown1">Dropdown 1:</label>
-            <select id="dropdown1">
-                <option value="Option 1">Option 1</option>
-                <option value="Option 2">Option 2</option>
-                <option value="Option 3">Option 3</option>
-                <option value="Option 4">Option 4</option>
-            </select>
-        </div>
-
-        <!-- ... repeat for dropdowns 2 to 10 ... -->
-
-        <div>
-            <label for="dropdown10">Dropdown 10:</label>
-            <select id="dropdown10">
-                <option value="Option 1">Option 1</option>
-                <option value="Option 2">Option 2</option>
-                <option value="Option 3">Option 3</option>
-                <option value="Option 4">Option 4</option>
-            </select>
-        </div>
-
-        <button type="button" onclick="showResult()">Show Results</button>
-    </form>
-
-    <h3>Selected Options:</h3>
-    <table id="resultTable">
+    <h1>Technocratic AI - Module#1 Error Classification</h1>
+    <table border="1">
         <tr>
-            <th>Dropdown</th>
-            <th>Selected Option</th>
+            <th>Error_id</th>
+            <th>Error_log</th>
+            <th>Error_category</th>
         </tr>
-        <!-- Table rows will be added here dynamically -->
+        {% for row in rows %}
+            <tr>
+                <td>{{ row['Error_id'] }}</td>
+                <td>{{ row['Error_log'] }}</td>
+                <td>{{ row['Error_category'] }}</td>
+        <form action="/update_status" method="post">
+            <td>
+                <input type="hidden" name="Error_id" value="{{ row['Error_id'] }}" />
+                <input type="hidden" name="Error_category" value="{{ row['Error_category'] }}" />
+                <button type="submit" name="status" value="approved" style="background-color: green;">Approve</button>
+                <button type="submit" name="status" value="denied" style="background-color: red;">Deny</button>
+            </td>
+        </form>
+            </tr>
+        {% endfor %}
     </table>
-
-    <script>
-        function showResult() {
-            var table = document.getElementById('resultTable');
-
-            // Clear previous results
-            table.innerHTML = '<tr><th>Dropdown</th><th>Selected Option</th></tr>';
-
-            // Loop through each dropdown and add its value to the table
-            for (var i = 1; i <= 10; i++) {
-                var dropdown = document.getElementById('dropdown' + i);
-                var row = table.insertRow(-1);
-                var cell1 = row.insertCell(0);
-                var cell2 = row.insertCell(1);
-                cell1.innerHTML = 'Dropdown ' + i;
-                cell2.innerHTML = dropdown.value;
-            }
-        }
-    </script>
 </body>
 </html>
-
